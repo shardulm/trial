@@ -7,11 +7,10 @@ import string,os, errno
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from SocketServer import ThreadingMixIn
-paths = dict()
+
 class POST_check:
     def __init__(self, handler):
         self.handler=handler
-
 
     def sendResponse(self, status_number):
         self.handler.send_response(status_number)
@@ -42,17 +41,25 @@ class POST_check:
            self.initiate()
 
     def initiate(self):
-        self.handler.server.table.add_entry(0,'','',0)
+        self.handler.server.table.add_entry(0, '', '', 0)
         
     def dir(self):
         len = int(self.handler.headers.get('Content-Length'))
-        dir_name=self.handler.rfile.read(len)
+        temp=self.handler.rfile.read(len)
+        (tmp, ignore, temp) = temp.partition(' ')
+        (tmp, ignore, temp) = temp.partition(' ')
+        mode=int(tmp)
+        (tmp, ignore, temp) = temp.partition(' ')
+        size=int(tmp)
+        (tmp, ignore, temp) = temp.partition(' ')
+        dir_name=tmp
         try:
-            os.mkdir('/home/shardul/' + dir_name)
+            os.mkdir('/home/shardul/' + dir_name, mode)
         except OSError, e:
             if e.errno != errno.EEXIST:
                 raise
         self.handler.server.table.change_entry_field(0,1,dir_name)
+#       self.handler.server.table.change_entry_field(0,1,dir_name)
         print self.handler.server.table.entry_list[0]
         self.sendResponse(200)
         return 0
@@ -60,7 +67,16 @@ class POST_check:
             
     def file(self):
         len = int(self.handler.headers.get('Content-Length'))
-        file_name=self.handler.rfile.read(len)
+        temp=self.handler.rfile.read(len)
+        (tmp, ignore, temp) = temp.partition(' ')
+        (tmp, ignore, temp) = temp.partition(' ')
+        mode=int(tmp)
+        (tmp, ignore, temp) = temp.partition(' ')
+        size=int(tmp)
+        (tmp, ignore, temp) = temp.partition(' ')
+        file_name=tmp
+        print 'File ' + file_name
+        print 'Mode ' , mode 
         dir_name=self.handler.server.table.get_value(0,1)
         print '/home/shardul/' + dir_name + '/' + file_name
         f=open('/home/shardul/' + dir_name + '/' + file_name, 'w')
@@ -69,9 +85,15 @@ class POST_check:
         self.handler.server.table.add_entry(0,'',file_name,0)
         self.handler.server.table.change_entry_field(0, 2, file_name)
         self.sendResponse(200)
-        
         return 0
        
+    def file_end(self):
+        trunc=self.handler.server.table.get_value(0,3)
+        f=open('/home/shardul/'+ dir_name + '/' + file_name,'a+')
+        f.truncate(trunc)
+        f.close()
+        self.sendResponse(200)
+        return 0
         
     def file_data(self):
 	ip  = self.handler.client_address[0]
