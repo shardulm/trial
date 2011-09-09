@@ -41,6 +41,8 @@ class POST_check:
         f=open('/home/shardul/' + file_name, 'w')
         print file_name
         self.handler.server.cur_file=file_name
+        self.handler.server.table.add_entry(0,0,file_name,0)
+        
         self.sendResponse(200)
         return 0
        
@@ -51,7 +53,10 @@ class POST_check:
         file_data=self.handler.rfile.read(len)
         print "Data " + file_data
         print "FILE NAME " + self.handler.server.cur_file
+        file_name=self.handler.server.table.get_file_name(0)
+        print file_name
         f = open('/home/shardul/'+self.handler.server.cur_file,'a+')
+        f=open('/home/shardul/'+ file_name,'a+')
         f.write(file_data + '\n')
         f.close()
         self.sendResponse(200)
@@ -79,16 +84,18 @@ class MyHandler (BaseHTTPRequestHandler):
 class metaTable():
     entry_list=[]
     count=0
-    def add_entry(self, index, cur_file, cur_dir, size):
-        self.entry_list[count][0]=index
-        self.entry_list[count][1]=cur_dir
-        self.entry_list[count][2]=cur_file
-        self.entry_list[count][3]=size
-        self.count=self.count+1
+    def add_entry(self, index, cur_dir, cur_file, size):
+        self.entry_list.append([index, cur_dir, cur_file, size])
 
-    def fetch_entry(self, index):
-        value=self.entry_list.index(index)
-        return entry_list[value:value+3]
+    def get_file_name(self, index):
+        list_len= len(self.entry_list)
+        print list_len
+        for i in range(0,list_len):
+            if self.entry_list[i][0]==index:
+                print 'SUCCESS'
+                return self.entry_list[i][2]
+#TODO : Handle case of failure            
+        return ''
     
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     table=metaTable()
