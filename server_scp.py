@@ -31,6 +31,9 @@ class POST_check:
         if operation == 'file_data':
             self.file_data()
             
+        if operation == 'file_end':
+            self.file_end()
+
         if operation == 'file':
             self.file()
 
@@ -76,19 +79,24 @@ class POST_check:
         (tmp, ignore, temp) = temp.partition(' ')
         file_name=tmp
         print 'File ' + file_name
-        print 'Mode ' , mode 
+        print 'Mode ' , mode
+        print 'Size ' , size
         dir_name=self.handler.server.table.get_value(0,1)
         print '/home/shardul/' + dir_name + '/' + file_name
         f=open('/home/shardul/' + dir_name + '/' + file_name, 'w')
         print file_name
         f.close()
-        self.handler.server.table.add_entry(0,'',file_name,0)
+#        self.handler.server.table.add_entry(0,'',file_name, size)
         self.handler.server.table.change_entry_field(0, 2, file_name)
+        self.handler.server.table.change_entry_field(0, 3, size)
         self.sendResponse(200)
         return 0
        
     def file_end(self):
         trunc=self.handler.server.table.get_value(0,3)
+        dir_name=self.handler.server.table.get_value(0,1)
+        file_name=self.handler.server.table.get_value(0,2)
+        print "Last truncate " , trunc 
         f=open('/home/shardul/'+ dir_name + '/' + file_name,'a+')
         f.truncate(trunc)
         f.close()
@@ -101,9 +109,9 @@ class POST_check:
         file_data=self.handler.rfile.read(len)
         dir_name=self.handler.server.table.get_value(0,1)
         file_name=self.handler.server.table.get_value(0,2)
-        print file_name
+        print file_name 
         f=open('/home/shardul/'+ dir_name + '/' + file_name,'a+')
-        f.write(file_data + '\n')
+        f.write(file_data)
         f.close()
         self.sendResponse(200)
         return 0
