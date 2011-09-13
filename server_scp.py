@@ -39,6 +39,9 @@ class POST_check:
 
         if operation == 'dir':
             self.dir()
+
+        if operation == 'dir_end':
+            self.dir_end()
             
         if operation == 'initiate':
            self.initiate()
@@ -57,7 +60,7 @@ class POST_check:
         (tmp, ignore, temp) = temp.partition(' ')
         dir_name=tmp
         try:
-            os.mkdir('/home/shardul/' + dir_name, mode)
+            os.makedirs("/home/shardul/" + dir_name, mode)
         except OSError, e:
             if e.errno != errno.EEXIST:
                 raise
@@ -86,7 +89,7 @@ class POST_check:
         f=open('/home/shardul/' + dir_name + '/' + file_name, 'w')
         print file_name
         f.close()
-#        self.handler.server.table.add_entry(0,'',file_name, size)
+#       self.handler.server.table.add_entry(0,'',file_name, size)
         self.handler.server.table.change_entry_field(0, 2, file_name)
         self.handler.server.table.change_entry_field(0, 3, size)
         self.sendResponse(200)
@@ -109,13 +112,21 @@ class POST_check:
         file_data=self.handler.rfile.read(len)
         dir_name=self.handler.server.table.get_value(0,1)
         file_name=self.handler.server.table.get_value(0,2)
-        print file_name 
+        print dir_name + '/' + file_name 
         f=open('/home/shardul/'+ dir_name + '/' + file_name,'a+')
         f.write(file_data)
         f.close()
         self.sendResponse(200)
         return 0
 
+    def dir_end(self):
+        dir_name=self.handler.server.table.get_value(0,1)
+        dir_name=dir_name.rsplit('/',1)[0]
+        self.handler.server.table.change_entry_field(0,1,dir_name)        
+        print "New Dir" + dir_name
+        self.sendResponse(200)
+        return 0
+        
 #Handler    
 class MyHandler (BaseHTTPRequestHandler):
 
