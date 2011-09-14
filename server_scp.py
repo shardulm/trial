@@ -42,12 +42,15 @@ class POST_check:
 
         if operation == 'dir_end':
             self.dir_end()
+
+        if operation == 'time':
+            self.time()
             
         if operation == 'initiate':
            self.initiate()
 
     def initiate(self):
-        self.handler.server.table.add_entry(0, '', '', 0)
+        self.handler.server.table.add_entry(0, '', '', 0, 0666, 0, 0)
         
     def dir(self):
         len = int(self.handler.headers.get('Content-Length'))
@@ -65,12 +68,24 @@ class POST_check:
             if e.errno != errno.EEXIST:
                 raise
         self.handler.server.table.change_entry_field(0,1,dir_name)
-#       self.handler.server.table.change_entry_field(0,1,dir_name)
         print self.handler.server.table.entry_list[0]
         self.sendResponse(200)
         return 0
     
-            
+    def time(self):
+        len = int(self.handler.headers.get('Content-Length'))
+        temp=self.handler.rfile.read(len)
+        (tmp, ignore, temp) = temp.partition(' ')
+        (tmp, ignore, temp) = temp.partition(' ')
+        atime=int(tmp)
+        self.handler.server.table.change_entry_field(0,5,atime)
+        (tmp, ignore, temp) = temp.partition(' ')
+        (tmp, ignore, temp) = temp.partition(' ')
+        mtime=tmp
+        self.handler.server.table.change_entry_field(0,6,mtime)        
+        print "Time", atime, "   ", mtime
+        return 0
+        
     def file(self):
         len = int(self.handler.headers.get('Content-Length'))
         temp=self.handler.rfile.read(len)
@@ -89,7 +104,6 @@ class POST_check:
         f=open('/home/shardul/' + dir_name + '/' + file_name, 'w')
         print file_name
         f.close()
-#       self.handler.server.table.add_entry(0,'',file_name, size)
         self.handler.server.table.change_entry_field(0, 2, file_name)
         self.handler.server.table.change_entry_field(0, 3, size)
         self.sendResponse(200)
@@ -102,7 +116,10 @@ class POST_check:
         print "Last truncate " , trunc 
         f=open('/home/shardul/'+ dir_name + '/' + file_name,'a+')
         f.truncate(trunc)
+        atime=int(self.handler.server.table.get_value(0,5))
+        mtime=int(self.handler.server.table.get_value(0,6))
         f.close()
+        os.utime('/home/shardul/'+ dir_name + '/' + file_name,(atime,mtime))
         self.sendResponse(200)
         return 0
         
@@ -124,6 +141,9 @@ class POST_check:
         dir_name=dir_name.rsplit('/',1)[0]
         self.handler.server.table.change_entry_field(0,1,dir_name)        
         print "New Dir" + dir_name
+        atime=int(self.handler.server.table.get_value(0,5))
+        mtime=int(self.handler.server.table.get_value(0,6))
+        os.utime('/home/shardul/'+ dir_name ,(atime,mtime))
         self.sendResponse(200)
         return 0
         
@@ -149,8 +169,8 @@ class MyHandler (BaseHTTPRequestHandler):
 class metaTable():
     entry_list=[]
     count=0
-    def add_entry(self, index, cur_dir, cur_file, size):
-        self.entry_list.append([index, cur_dir, cur_file, size])
+    def add_entry(self, index, cur_dir, cur_file, size, mode, atime, mtime):
+        self.entry_list.append([index, cur_dir, cur_file, size, mode, atime, mtime])
 
     def change_entry_field(self, index, value_key, value):
         list_len= len(self.entry_list)
@@ -184,8 +204,6 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 def main():
 	try:
 		server = ThreadingHTTPServer(('', 5080), MyHandler)
-                server.set_var(10)
-                server.get_var()
 		print 'Started POST_check HttpServer.....'
 		server.serve_forever()
 
