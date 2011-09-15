@@ -3,7 +3,7 @@
 # Client side command to communicate to this server
 # curl -d @ssh.py "http://<IP>:<port>/put_ssh_key/"
 
-import string,os, errno
+import string,os,errno, uuid
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from SocketServer import ThreadingMixIn
@@ -50,24 +50,40 @@ class POST_check:
            self.initiate()
 
     def initiate(self):
-        self.handler.server.table.add_entry(0, '', '', 0, 0666, 0, 0)
+        len = int(self.handler.headers.get('Content-Length'))
+        base_dir=self.handler.rfile.read(len)
+        id1=uuid.uuid4()        
+        try:
+            os.makedirs(base_dir)
+        except OSError, e:
+            if e.errno != errno.EEXIST:
+                raise
+        print 'Base Dir is ' ,base_dir
+        idd=str(int(id1))
+#        print self.handler.server.table.entry_list[0]        
+        self.handler.server.table.add_entry(idd, '', '', 0, 0666, '', '', base_dir)
+        print self.handler.server.table.entry_list[0]        
+        self.handler.wfile.write(int(id1))
+        self.sendResponse(200)
         
     def dir(self):
         len = int(self.handler.headers.get('Content-Length'))
         temp=self.handler.rfile.read(len)
         (tmp, ignore, temp) = temp.partition(' ')
+        (index, ignore, tmp) = tmp.partition(':')        
         (tmp, ignore, temp) = temp.partition(' ')
         mode=int(tmp)
         (tmp, ignore, temp) = temp.partition(' ')
         size=int(tmp)
         (tmp, ignore, temp) = temp.partition(' ')
+        base_dir=self.handler.server.table.get_value(index,7)
         dir_name=tmp
         try:
-            os.makedirs("/home/shardul/" + dir_name, mode)
+            os.makedirs(base_dir + dir_name, mode)
         except OSError, e:
             if e.errno != errno.EEXIST:
                 raise
-        self.handler.server.table.change_entry_field(0,1,dir_name)
+        self.handler.server.table.change_entry_field(index,1,dir_name)
         print self.handler.server.table.entry_list[0]
         self.sendResponse(200)
         return 0
@@ -76,74 +92,90 @@ class POST_check:
         len = int(self.handler.headers.get('Content-Length'))
         temp=self.handler.rfile.read(len)
         (tmp, ignore, temp) = temp.partition(' ')
+        (index, ignore, tmp) = tmp.partition(':')        
         (tmp, ignore, temp) = temp.partition(' ')
         atime=int(tmp)
-        self.handler.server.table.change_entry_field(0,5,atime)
+        self.handler.server.table.change_entry_field(index,5,atime)
         (tmp, ignore, temp) = temp.partition(' ')
         (tmp, ignore, temp) = temp.partition(' ')
         mtime=tmp
-        self.handler.server.table.change_entry_field(0,6,mtime)        
+        self.handler.server.table.change_entry_field(index,6,mtime)        
         print "Time", atime, "   ", mtime
         return 0
         
     def file(self):
         len = int(self.handler.headers.get('Content-Length'))
         temp=self.handler.rfile.read(len)
+        print temp
         (tmp, ignore, temp) = temp.partition(' ')
+        (index, ignore, tmp) = tmp.partition(':')
+        print "Aheroa", index
         (tmp, ignore, temp) = temp.partition(' ')
         mode=int(tmp)
         (tmp, ignore, temp) = temp.partition(' ')
         size=int(tmp)
         (tmp, ignore, temp) = temp.partition(' ')
         file_name=tmp
+        print self.handler.server.table.entry_list[0]
         print 'File ' + file_name
         print 'Mode ' , mode
         print 'Size ' , size
-        dir_name=self.handler.server.table.get_value(0,1)
-        print '/home/shardul/' + dir_name + '/' + file_name
-        f=open('/home/shardul/' + dir_name + '/' + file_name, 'w')
+        base_dir=self.handler.server.table.get_value(index,7)        
+        dir_name=self.handler.server.table.get_value(index,1)
+        print 'Full Path' ,base_dir + dir_name + '/' + file_name
+        f=open(base_dir + dir_name + '/' + file_name, 'w')
         print file_name
         f.close()
-        self.handler.server.table.change_entry_field(0, 2, file_name)
-        self.handler.server.table.change_entry_field(0, 3, size)
+        self.handler.server.table.change_entry_field(index, 2, file_name)
+        self.handler.server.table.change_entry_field(index, 3, size)
         self.sendResponse(200)
         return 0
        
     def file_end(self):
-        trunc=self.handler.server.table.get_value(0,3)
-        dir_name=self.handler.server.table.get_value(0,1)
-        file_name=self.handler.server.table.get_value(0,2)
+        len = int(self.handler.headers.get('Content-Length'))
+        index=self.handler.rfile.read(len)
+        base_dir=self.handler.server.table.get_value(index,7)
+        trunc=self.handler.server.table.get_value(index,3)
+        dir_name=self.handler.server.table.get_value(index,1)
+        file_name=self.handler.server.table.get_value(index,2)
         print "Last truncate " , trunc 
-        f=open('/home/shardul/'+ dir_name + '/' + file_name,'a+')
+        f=open(base_dir+ dir_name + '/' + file_name,'a+')
         f.truncate(trunc)
-        atime=int(self.handler.server.table.get_value(0,5))
-        mtime=int(self.handler.server.table.get_value(0,6))
+        atime=int(self.handler.server.table.get_value(index,5))
+        mtime=int(self.handler.server.table.get_value(index,6))
         f.close()
-        os.utime('/home/shardul/'+ dir_name + '/' + file_name,(atime,mtime))
+        os.utime(base_dir + dir_name + '/' + file_name,(atime,mtime))
         self.sendResponse(200)
         return 0
         
     def file_data(self):
+
 	ip  = self.handler.client_address[0]
         len = int(self.handler.headers.get('Content-Length'))
         file_data=self.handler.rfile.read(len)
-        dir_name=self.handler.server.table.get_value(0,1)
-        file_name=self.handler.server.table.get_value(0,2)
-        print dir_name + '/' + file_name 
-        f=open('/home/shardul/'+ dir_name + '/' + file_name,'a+')
+        (index, ignore, file_data) = file_data.partition(':')
+        base_dir=self.handler.server.table.get_value(index,7)        
+        dir_name=self.handler.server.table.get_value(index,1)
+        file_name=self.handler.server.table.get_value(index,2)
+        print 'File_data Full path', base_dir + dir_name + '/' + file_name 
+        f=open(base_dir + dir_name + '/' + file_name,'a+')
         f.write(file_data)
         f.close()
         self.sendResponse(200)
         return 0
 
     def dir_end(self):
-        dir_name=self.handler.server.table.get_value(0,1)
+        len = int(self.handler.headers.get('Content-Length'))
+        index=self.handler.rfile.read(len)
+        
+        base_dir=self.handler.server.table.get_value(index,7)        
+        dir_name=self.handler.server.table.get_value(index,1)
         dir_name=dir_name.rsplit('/',1)[0]
-        self.handler.server.table.change_entry_field(0,1,dir_name)        
+        self.handler.server.table.change_entry_field(index,1,dir_name)        
         print "New Dir" + dir_name
-        atime=int(self.handler.server.table.get_value(0,5))
-        mtime=int(self.handler.server.table.get_value(0,6))
-        os.utime('/home/shardul/'+ dir_name ,(atime,mtime))
+        atime=int(self.handler.server.table.get_value(index,5))
+        mtime=int(self.handler.server.table.get_value(index,6))
+        os.utime(base_dir + dir_name ,(atime,mtime))
         self.sendResponse(200)
         return 0
         
@@ -169,8 +201,8 @@ class MyHandler (BaseHTTPRequestHandler):
 class metaTable():
     entry_list=[]
     count=0
-    def add_entry(self, index, cur_dir, cur_file, size, mode, atime, mtime):
-        self.entry_list.append([index, cur_dir, cur_file, size, mode, atime, mtime])
+    def add_entry(self, index, cur_dir, cur_file, size, mode, atime, mtime, base_dir):
+        self.entry_list.append([index, cur_dir, cur_file, size, mode, atime, mtime, base_dir])
 
     def change_entry_field(self, index, value_key, value):
         list_len= len(self.entry_list)
